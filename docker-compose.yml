@@ -1,0 +1,76 @@
+version: "3"
+
+services:
+  #Database
+  db:
+    container_name: db
+    image: mysql
+    command: '--default-authentication-plugin=mysql_native_password'
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_RANDOM_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+    - db_data:/var/lib/mysql
+    networks:
+    - my_network
+  #Init-container
+  init-db:
+    image: mysql
+    command: /container-init.sh
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_RANDOM_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+    - ./initproject.sh:/container-init.sh
+    depends_on:
+      db:
+        condition: service_started
+    networks:
+    - my_network
+  #Application
+  wordpress:
+    depends_on:
+    - db
+    image: wordpress
+    ports:
+    - 80:80
+    volumes:
+    - db_data:/var/lib/mysql
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+    networks:
+    - my_network
+  #WP-cli
+  wp-cli:
+    image: wordpress:cli
+    container_name: wp-cli
+    restart: always
+    volumes:
+    - db_data:/var/lib/mysql
+    volumes_from:
+    - wordpress
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+    env_file: ./site.env
+    depends_on:
+    - db
+    - wordpress
+    networks:
+    - my_network
+#Bridge
+volumes:
+  db_data:
+networks:
+  my_network:
+    driver: bridge
